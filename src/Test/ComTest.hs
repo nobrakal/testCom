@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module ComTest
+module TestCom
     ( runTests
     ) where
 
