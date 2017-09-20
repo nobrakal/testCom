@@ -4,16 +4,23 @@ module TestCom
     ( runTests
     ) where
 
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax
+
 data TestT = TestT {
   testsN :: [[String]] ,
   testF :: String
 }
 
-runTests :: FilePath -> IO Bool
+runTests :: FilePath -> IO (Bool,String)
 runTests fp = do
   file <- readFile fp
   let comm = keepCommentsAndFollowing (lines file) False [TestT [[]] ""]
-  return True
+  return (True,"")
+
+buildTests :: [TestT] -> [Q Dec]
+buildTests [] = []
+buildTests (x:xs) = [] : buildTest xs
 
 keepCommentsAndFollowing :: [String] -> Bool -> [TestT] -> [TestT]
 keepCommentsAndFollowing [] _ tab = tab
