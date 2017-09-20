@@ -20,7 +20,11 @@ runTests fp = do
 
 buildTests :: [TestT] -> [Q Dec]
 buildTests [] = []
-buildTests (x:xs) = [] : buildTest xs
+buildTests (x:xs) = nd : buildTest nxs
+  where
+    nxs = if length xs == 1 then xs else (tail x):xs
+    nd = do
+      return []
 
 keepCommentsAndFollowing :: [String] -> Bool -> [TestT] -> [TestT]
 keepCommentsAndFollowing [] _ tab = tab
