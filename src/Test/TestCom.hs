@@ -32,7 +32,15 @@ buildTests' x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' nxs
     fname = mkName $ "_TEST_" ++ testF' ++ show actualU'
     norm = integerL $ read $ head resTest'
     res = (appRec (head valueTest', (varE $ mkName testF')))
-    fbody = guardedB [(normalG (appE (appE ([| (==) |]) (litE norm)) res), [e|Right True|]),(normalG  [e|otherwise|], appE [e|Left|] [e|$(testF')|] ) ]
+    guar1 = do
+      a <- appE (appE ([| (==) |]) (litE norm)) res
+      b <- [e|Right True|]
+      return (NormalG a,b)
+    guar2 = do
+      a <- [e|otherwise|]
+      b <- appE [e|Left|] $ litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " /= " ++ (head resTest')))
+      return (NormalG a,b)
+    fbody = guardedB [guar1,guar2]
     fClause = clause [] fbody []
     nd = funD fname [fClause]
 

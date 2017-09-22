@@ -6,7 +6,7 @@ import Language.Haskell.TH.Syntax
 
 import Test.TestCom
 
-$(sequenceQ $ buildTests [TestT [["1","2"]] ["3"] "add" 0])
+$(sequenceQ $ buildTests [TestT [["1","2"]] ["4"] "add" 0])
 
 -- Tests
 main :: IO ()
