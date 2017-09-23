@@ -3,6 +3,7 @@
 module Test.TestCom
     ( TestT (..),
     makeAllTests,
+    makeAllTestsHere,
     getTestT
     ) where
 
@@ -18,20 +19,25 @@ data TestT = TestT {
   actualU :: Int
 } deriving (Show)
 
-makeAllTests :: Q [Dec]
-makeAllTests = do
-  loc <- location >>= (\(Loc y _ _ _ _) -> return y)
-  file <- runIO $ readFile loc
-  funcs <- sequenceQ (buildTests (getTestT file))
-  nd <- runTests loc $ appRecDec $ funcs
+makeAllTests :: String -> Q [Dec]
+makeAllTests str = do
+  let str' = (take ((length str)-3) (replaceSlashByUnderscore str))
+  file <- runIO $ readFile str
+  funcs <- sequenceQ (buildTests str' (getTestT file))
+  nd <- runTests str' $ appRecDec $ funcs
   return (nd : funcs)
 
-buildTests' :: TestT -> [Q Dec]
-buildTests' (TestT [] _ _ _) = []
-buildTests' x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' nxs
+makeAllTestsHere :: Q [Dec]
+makeAllTestsHere = do
+  loc <- location >>= (\(Loc y _ _ _ _) -> return y)
+  makeAllTests loc
+
+buildTests' :: String -> TestT -> [Q Dec]
+buildTests' _ (TestT [] _ _ _) = []
+buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s nxs
   where
     nxs = x {valueTest = tail valueTest', resTest = tail resTest', actualU = actualU'+1}
-    fname = mkName $ "_TEST_" ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
+    fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
     norm = integerL $ read $ head resTest' -- For now only integer
     res = (appRec (head valueTest', (varE $ mkName testF')))
     guar1 = do
@@ -46,14 +52,14 @@ buildTests' x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' nxs
     fClause = clause [] fbody []
     nd = funD fname [fClause]
 
-buildTests :: [TestT] -> [Q Dec]
-buildTests [] = []
-buildTests (x:xs) = (buildTests' x) ++ (buildTests xs)
+buildTests :: String -> [TestT] -> [Q Dec]
+buildTests _ [] = []
+buildTests s (x:xs) = (buildTests' s x) ++ (buildTests s xs)
 
 runTests :: String -> [Q Exp] -> Q Dec
 runTests str funcs_runned = funD fname [fClause]
   where
-    fname = mkName $ "_TEST_"++ take ((length str)-3) (replaceSlashByUnderscore str)
+    fname = mkName $ "_TEST_"++ str
     ex = appE (appE ([e|(++)|]) (appE [e|unlines|] (appE [e|builFinalString|] (listE funcs_runned)))) (([e|"TOTAL PASSED: " ++ show countRight' ++ "/"++ show length'|]))
     cr = valD (varP (mkName "countRight'")) (normalB (appE [e|countRight|] (listE funcs_runned))) []
     len = valD (varP (mkName "length'")) (normalB (appE [e|length|] (listE funcs_runned))) []

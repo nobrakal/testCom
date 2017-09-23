@@ -7,7 +7,7 @@ import System.Exit
 
 import Test.TestCom
 
-$(makeAllTests)
+$(makeAllTestsHere)
 
 main :: IO ()
 main = do

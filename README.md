@@ -21,13 +21,15 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import System.Exit
 
-$(makeAllTests)
+$(makeAllTestsHere)
+$(makeAllTests "some/Path/File.hs")
 
 -- Tests
 main :: IO ()
 main = do
-  let (str,res) = _TEST_path
+  let (str,res) = _TEST_path -- Here, path=directory_actualfile. If your file is put in tests/Main.hs, then path=tests_Main (without the ".hs")
+  let (str',res') = _TEST_some_Path_File
   putStrLn str
-  if res then exitSuccess else exitFailure
+  putStrLn str'
+  if res && res' then exitSuccess else exitFailure
 ```
-Here, path=directory_actualfile. If your file is put in tests/Main.hs, then path=tests_Main (without the ".hs")
