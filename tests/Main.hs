@@ -19,3 +19,15 @@ main = do
 --[1 2 3]
 add :: Int -> Int -> Int
 add x y = x+y
+
+--['a' 'b' "ab"]
+add' :: Char -> Char -> String
+add' x y = [x,y]
+
+--[(1,2) (2,3) (3,5)]
+add'' :: (Int,Int) -> (Int,Int) -> (Int,Int)
+add'' (x,y) (x',y') = (x+x',y+y')
+
+--[[1,2] [3] [1,2,3]]
+add''' :: [Int] -> [Int] -> [Int]
+add''' x y = x ++ y

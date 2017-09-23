@@ -33,3 +33,13 @@ main = do
   putStrLn str'
   if res && res' then exitSuccess else exitFailure
 ```
+
+### What is guaranteed to work
+Every function with arguments like:
+
+* integer
+* Char
+* String
+* Tuple
+* List
+* Evrything that instanciate "read"

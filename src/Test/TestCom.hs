@@ -11,6 +11,8 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Data.List
 import Data.Either
+import Data.Char
+import Data.Maybe (fromJust)
 
 data TestT = TestT {
   valueTest :: [[String]], -- list of list of args
@@ -21,7 +23,7 @@ data TestT = TestT {
 
 makeAllTests :: String -> Q [Dec]
 makeAllTests str = do
-  let str' = (take ((length str)-3) (replaceSlashByUnderscore str))
+  let str' = (take ((length str)-3) (replaceXbyY str '/' '_'))
   file <- runIO $ readFile str
   funcs <- sequenceQ (buildTests str' (getTestT file))
   nd <- runTests str' $ appRecDec $ funcs
@@ -38,15 +40,15 @@ buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s
   where
     nxs = x {valueTest = tail valueTest', resTest = tail resTest', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
-    norm = integerL $ read $ head resTest' -- For now only integer
-    res = (appRec (head valueTest', (varE $ mkName testF')))
+    norm = getLitE $ head resTest' -- For now only integer
+    res = (appRec (reverse (head valueTest'), (varE $ mkName testF')))
     guar1 = do
-      a <- appE (appE ([| (==) |]) (litE norm)) res
+      a <- appE (appE ([| (==) |]) norm) res
       b <- appE [e|Right|] $ litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " == " ++ (head resTest')))
       return (NormalG a,b)
     guar2 = do
       a <- [e|otherwise|]
-      b <- appE [e|Left|] $ litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " /= " ++ (head resTest')))
+      b <- appE [e|Left|] $ appE (appE [e|(++)|] (litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT ")))) (appE [e|show|] res)
       return (NormalG a,b)
     fbody = guardedB [guar1,guar2]
     fClause = clause [] fbody []
@@ -67,9 +69,8 @@ runTests str funcs_runned = funD fname [fClause]
     fClause = clause [] (normalB (tupE [ex,boo])) [cr,len]
 
 appRec :: ([String],Q Exp) -> Q Exp
--- appRec [] = return
 appRec ([],a) = a
-appRec ((x:xs),b) = appE (appRec (xs,b)) (litE $ integerL (read x))
+appRec ((x:xs),b) = appE (appRec (xs,b)) (getLitE x)
 
 -- Run all declarations and store them into a tab
 appRecDec :: [Dec] -> [Q Exp]
@@ -94,7 +95,7 @@ getTestT' :: [String] -> Bool -> TestT -> [TestT]
 getTestT' [] _ _ = []
 getTestT' (x:xs) b t
   | "--[" `isPrefixOf` x && "]" `isSuffixOf` x = getTestT' xs True $ t {valueTest = args : (valueTest t), resTest = res : (resTest t)}
-  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (TestT [[]] [] [] 0)
+  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (TestT [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
     list = words $ drop 3 (init x)
@@ -102,8 +103,23 @@ getTestT' (x:xs) b t
     res = last list
     hw = head (words x)
 
-replaceSlashByUnderscore :: String -> String
-replaceSlashByUnderscore [] = []
-replaceSlashByUnderscore (x:xs)
-  | x == '/' = '_':replaceSlashByUnderscore xs
-  | otherwise = x : replaceSlashByUnderscore xs
+replaceXbyY :: String -> Char -> Char -> String
+replaceXbyY [] _ _ = []
+replaceXbyY (x:xs) a b
+  | x == a = b:replaceXbyY xs a b
+  | otherwise = x : replaceXbyY xs a b
+
+getLitE :: String -> Q Exp
+getLitE str
+  | head str == '\'' && last str == '\'' = litE $ charL $ str !! 1 -- Char
+  | head str == '\"' && last str == '\"' = litE $ stringL btw -- String
+  | (foldl (\y x -> y && isDigit x ) True str) = litE $ integerL (read str) -- Integer
+  | '%' `elem` str = litE $ rationalL $ read str -- Ratio
+  | head str == '(' && last str == ')' = tupE [getLitE fst', getLitE snd'] -- Tuple
+  | head str == '[' && last str == ']' = listE $ getList $ words $ replaceXbyY btw ',' ' ' -- Tuple
+  | otherwise = appE [e|read|] (litE $ stringL str) -- Par anything else with read
+  where
+    btw = init $ tail $ str
+    (fst',_:snd') = splitAt (fromJust (elemIndex ',' btw)) btw
+    getList [] = []
+    getList (x:xs) = getLitE x : getList xs
