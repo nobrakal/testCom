@@ -13,17 +13,21 @@ add x y = x+y
 ```
 
 #### Run them
+For example
 ```
+{-# LANGUAGE TemplateHaskell #-}
+
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import System.Exit
 
-$(sequenceQ $ makeAllTests fileToTest.hs)
+$(makeAllTests)
 
 -- Tests
 main :: IO ()
 main = do
-  let (str,res) = _TEST_runAllTests
+  let (str,res) = _TEST_path
   putStrLn str
   if res then exitSuccess else exitFailure
 ```
+Here, path=directory_actualfile. If your file is put in tests/Main.hs, then path=tests_Main (without the ".hs")
