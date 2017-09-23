@@ -25,8 +25,11 @@ makeAllTests tab = nd : funcs
     funcs = buildTests tab
     fname = mkName "_TEST_runAllTests"
     funcs_runned = appRecDec funcs
-    ex = appE (appE ([e|(++)|]) (appE [e|unlines|] (appE [e|builFinalString|] (listE funcs_runned)))) (appE ([e|\z -> "TOTAL PASSED: " ++ show (countRight z) ++ "/"++ show (length z)|]) (listE funcs_runned))
-    fClause = clause [] (normalB ex) []
+    ex = appE (appE ([e|(++)|]) (appE [e|unlines|] (appE [e|builFinalString|] (listE funcs_runned)))) (([e|"TOTAL PASSED: " ++ show countRight' ++ "/"++ show length'|]))
+    cr = valD (varP (mkName "countRight'")) (normalB (appE [e|countRight|] (listE funcs_runned))) []
+    len = valD (varP (mkName "length'")) (normalB (appE [e|length|] (listE funcs_runned))) []
+    boo = [e|countRight' == length' |]
+    fClause = clause [] (normalB (tupE [ex,boo])) [cr,len]
     nd = funD fname [fClause]
 
 buildTests' :: TestT -> [Q Dec]

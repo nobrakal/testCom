@@ -14,12 +14,16 @@ add x y = x+y
 
 #### Run them
 ```
-import Test.TestCom
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax
+import System.Exit
 
 $(sequenceQ $ makeAllTests fileToTest.hs)
 
 -- Tests
 main :: IO ()
 main = do
-  putStrLn _TEST_runAllTests
+  let (str,res) = _TEST_runAllTests
+  putStrLn str
+  if res then exitSuccess else exitFailure
 ```
