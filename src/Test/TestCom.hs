@@ -9,10 +9,9 @@ module Test.TestCom
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
+import Language.Haskell.Meta.Parse
 import Data.List
 import Data.Either
-import Data.Char
-import Data.Maybe (fromJust)
 
 data TestT = TestT {
   valueTest :: [[String]], -- list of list of args
@@ -40,7 +39,7 @@ buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s
   where
     nxs = x {valueTest = tail valueTest', resTest = tail resTest', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
-    norm = getLitE $ head resTest' -- For now only integer
+    norm = either (const $ liftString "Failed to parse") return $ parseExp $ head resTest' -- For now only integer
     res = (appRec (reverse (head valueTest'), (varE $ mkName testF')))
     guar1 = do
       a <- appE (appE ([| (==) |]) norm) res
@@ -70,7 +69,7 @@ runTests str funcs_runned = funD fname [fClause]
 
 appRec :: ([String],Q Exp) -> Q Exp
 appRec ([],a) = a
-appRec ((x:xs),b) = appE (appRec (xs,b)) (getLitE x)
+appRec ((x:xs),b) = appE (appRec (xs,b)) (either (const $ liftString "Failed to parse") return $ parseExp x)
 
 -- Run all declarations and store them into a tab
 appRecDec :: [Dec] -> [Q Exp]
@@ -108,18 +107,3 @@ replaceXbyY [] _ _ = []
 replaceXbyY (x:xs) a b
   | x == a = b:replaceXbyY xs a b
   | otherwise = x : replaceXbyY xs a b
-
-getLitE :: String -> Q Exp
-getLitE str
-  | head str == '\'' && last str == '\'' = litE $ charL $ str !! 1 -- Char
-  | head str == '\"' && last str == '\"' = litE $ stringL btw -- String
-  | (foldl (\y x -> y && isDigit x ) True str) = litE $ integerL (read str) -- Integer
-  | '%' `elem` str = litE $ rationalL $ read str -- Ratio
-  | head str == '(' && last str == ')' = tupE [getLitE fst', getLitE snd'] -- Tuple
-  | head str == '[' && last str == ']' = listE $ getList $ words $ replaceXbyY btw ',' ' ' -- Tuple
-  | otherwise = appE [e|read|] (litE $ stringL str) -- Par anything else with read
-  where
-    btw = init $ tail $ str
-    (fst',_:snd') = splitAt (fromJust (elemIndex ',' btw)) btw
-    getList [] = []
-    getList (x:xs) = getLitE x : getList xs
