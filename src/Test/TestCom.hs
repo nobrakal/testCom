@@ -1,10 +1,66 @@
 {-# LANGUAGE TemplateHaskell #-}
+{- | ==Usage
+
+  In any file, you can specify tests above a function declaration, like:
+
+  @
+  --[1 2 3]
+  add x y = x+y
+  @
+
+  Later, on your test file, you can build tests functions with
+
+  @
+  \{\-\# LANGUAGE TemplateHaskell \#\-\}
+  $(makeAllTests "some\/Path\/File.hs")
+  @
+
+  and use the produced function in your main:
+
+  @
+  import System.Exit
+
+  main :: IO ()
+  main = do
+    let (str,res) = _TEST_some_Path_File
+    putStrLn str
+    if res then exitSuccess else exitFailure
+  @
+
+  If you want to make tests on the actual file, you can use
+
+  @
+  $(makeAllTestsHere)
+  @
+
+  the function produced will be equivalent to the one produced by
+
+  @
+  $(makeAllTests "path\/to\/file\/known\/by\/ghc")
+  @
+
+  == String produced
+  Considering the given file:
+
+  @
+  --[1 2 3]
+  --[1 2 4]
+  add x y = x+y
+  @
+
+  The string produced will be:
+
+  @
+  Test passed: add 1 2  == 3
+  Error: add 1 2 /= 4 BUT == 3
+  @
+
+ -}
+
 
 module Test.TestCom
-    ( TestT (..),
-    makeAllTests,
-    makeAllTestsHere,
-    getTestT
+    (makeAllTests,
+    makeAllTestsHere
     ) where
 
 import Language.Haskell.TH
@@ -20,7 +76,16 @@ data TestT = TestT {
   actualU :: Int
 } deriving (Show)
 
-makeAllTests :: String -> Q [Dec]
+-- | With a path like some\/Path\/File.hs, Create a function
+--
+-- @
+-- _TEST_some_Path_File :: (String,Bool)
+-- @
+--
+-- with the string containing the result of all tests, and the boolean set to @True@ if and only if all tests passed
+--
+-- This also create sub-functions that each produce a Eihter String String
+makeAllTests :: FilePath -> Q [Dec]
 makeAllTests str = do
   let str' = (take ((length str)-3) (replaceXbyY str '/' '_'))
   file <- runIO $ readFile str
