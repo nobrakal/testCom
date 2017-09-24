@@ -34,7 +34,7 @@ makeAllTestsHere = do
   makeAllTests loc
 
 buildTests' :: String -> TestT -> [Q Dec]
-buildTests' _ (TestT [] _ _ _) = []
+buildTests' _ (TestT [] [] _ _) = []
 buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s nxs
   where
     nxs = x {valueTest = tail valueTest', resTest = tail resTest', actualU = actualU'+1}
@@ -47,7 +47,7 @@ buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s
       return (NormalG a,b)
     guar2 = do
       a <- [e|otherwise|]
-      b <- appE [e|Left|] $ appE (appE [e|(++)|] (litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT ")))) (appE [e|show|] res)
+      b <- appE [e|Left|] $ appE (appE [e|(++)|] (litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT == ")))) (appE [e|show|] res)
       return (NormalG a,b)
     fbody = guardedB [guar1,guar2]
     fClause = clause [] fbody []
@@ -98,7 +98,7 @@ getTestT' (x:xs) b t
   | otherwise = getTestT' xs b t
   where
     list = words $ drop 3 (init x)
-    args = init list
+    args = if length list == 1 then [] else init list
     res = last list
     hw = head (words x)
 
