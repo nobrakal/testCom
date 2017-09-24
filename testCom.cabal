@@ -2,7 +2,7 @@ name:                testCom
 version:             0.1.0
 synopsis:            Write your tests in comments
 description:         With some TemplateHaskell magic, you can write your tests in your comments directly above a function declaration with a minimalist syntax.
-license:             PublicDomain
+license:             GPL
 author:              Alexandre Moine
 maintainer:          nobrakal@cthugha.org
 category:            Test
@@ -15,8 +15,8 @@ bug-reports:         https://github.com/nobrakal/testCom/issues
 extra-source-files: ChangeLog README.md
 
 source-repository head
-  type:     git
-  location: git://github.com/nobrakal/testCom.git
+  type:           git
+  location:       git://github.com/nobrakal/testCom.git
 
 library
   exposed-modules:    Test.TestCom
