@@ -3,6 +3,7 @@ version:             0.1.0
 synopsis:            Write your tests in comments
 description:         With some TemplateHaskell magic, you can write your tests in your comments directly above a function declaration with a minimalistic syntax.
 license:             GPL
+license-file:        License
 author:              Alexandre Moine
 maintainer:          nobrakal@cthugha.org
 category:            Test
