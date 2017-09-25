@@ -33,3 +33,7 @@ main = do
   putStrLn str'
   if res && res' then exitSuccess else exitFailure
 ```
+
+### TODO
+
+* Encapuslate parse error.
