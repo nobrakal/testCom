@@ -8,6 +8,7 @@
   add x y = x+y
   @
 
+  You can use any object deriving from Show and Eq as an argument for tests.
   Later, on your test file, you can build tests functions with
 
   @
@@ -68,6 +69,7 @@ import Language.Haskell.TH.Syntax
 import Language.Haskell.Meta.Parse
 import Data.List
 import Data.Either
+import Data.Maybe (fromJust)
 
 data TestT = TestT {
   valueTest :: [[String]], -- list of list of args
@@ -129,7 +131,7 @@ runTests str funcs_runned = funD fname [fClause]
     ex = appE (appE ([e|(++)|]) (appE [e|unlines|] (appE [e|builFinalString|] (listE funcs_runned)))) (([e|"TOTAL PASSED: " ++ show countRight' ++ "/"++ show length'|]))
     cr = valD (varP (mkName "countRight'")) (normalB (appE [e|countRight|] (listE funcs_runned))) []
     len = valD (varP (mkName "length'")) (normalB (appE [e|length|] (listE funcs_runned))) []
-    boo = [e|countRight' == length' |]
+    boo = [e|countRight' == length'|]
     fClause = clause [] (normalB (tupE [ex,boo])) [cr,len]
 
 appRec :: ([String],Q Exp) -> Q Exp
@@ -162,13 +164,32 @@ getTestT' (x:xs) b t
   | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (TestT [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
-    list = words $ drop 3 (init x)
+    list = words' $ drop 3 (init x)
     args = if length list == 1 then [] else init list
     res = last list
     hw = head (words x)
+
+words' :: String -> [String]
+words' [] = []
+words' str
+  | "(" `isPrefixOf` str = a : words' (if null b then [] else tail b)
+  | otherwise = head w : words' (unwords (tail w))
+  where
+    w = words str
+    (_,ind) = parenPairs str
+    (a,b) = splitAt (ind+1) str
 
 replaceXbyY :: String -> Char -> Char -> String
 replaceXbyY [] _ _ = []
 replaceXbyY (x:xs) a b
   | x == a = b:replaceXbyY xs a b
   | otherwise = x : replaceXbyY xs a b
+
+parenPairs :: String -> (Int, Int)
+parenPairs = go 0 []
+  where
+    go _ _ [] = (0,0) --Maybe encapsulate with Maybe
+    go j acc ('(' : cs) = go (j + 1) (j : acc) cs
+    go j [] (')' : cs) = go (j + 1) [] cs -- unbalanced parentheses!
+    go j (i : is) (')' : cs) = (i, j) -- : go (j + 1) is cs
+    go j acc (c : cs) = go (j + 1) acc cs

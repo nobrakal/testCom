@@ -7,6 +7,8 @@ import System.Exit
 
 import Test.TestCom
 
+data Point = Point Int Int deriving (Show,Eq)
+
 $(makeAllTestsHere)
 
 main :: IO ()
@@ -39,3 +41,7 @@ add'''' f a b = f a b
 --[2]
 onlyOne :: Int
 onlyOne = 2
+
+--[(Point 1 2) (Point 2 3) (Point 3 5)]
+add''''' :: Point -> Point -> Point
+add''''' (Point y x) (Point y' x') = Point (y+y') (x+x')
