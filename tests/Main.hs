@@ -16,25 +16,26 @@ main = do
   let (str,res) = _TEST_tests_Main
   putStrLn str
   if res then exitSuccess else exitFailure
-  -- print $ getTestT file
+  {- p <- readFile ("/home/nobrakal/Documents/prog/testCom/tests/Main.hs")
+  print $ getTestT p -}
 
---[1 2 3]
+--[1 2][3]
 add :: Int -> Int -> Int
 add x y = x+y
 
---['a' 'b' "ab"]
+--['a' 'b']["ab"]
 add' :: Char -> Char -> String
 add' x y = [x,y]
 
---[(1,2) (2,3) (3,5)]
+--[(1,2) (2,3)][(3,5)]
 add'' :: (Int,Int) -> (Int,Int) -> (Int,Int)
 add'' (x,y) (x',y') = (x+x',y+y')
 
---[[1,2] [3] [1,2,3]]
+--[[1,2] [3]][[1,2,3]]
 add''' :: [Int] -> [Int] -> [Int]
 add''' x y = x ++ y
 
---[add 1 2 5]
+--[add 1 2][5]
 add'''' :: (Int -> Int -> Int) -> Int -> Int -> Int
 add'''' f a b = f a b
 
@@ -42,6 +43,6 @@ add'''' f a b = f a b
 onlyOne :: Int
 onlyOne = 2
 
---[(Point 1 2) (Point 2 3) (Point 3 5)]
+--[(Point 1 2) (Point 2 3)][(Point 3 5)]
 add''''' :: Point -> Point -> Point
 add''''' (Point y x) (Point y' x') = Point (y+y') (x+x')

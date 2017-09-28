@@ -61,18 +61,19 @@
 
 module Test.TestCom
     (makeAllTests,
-    makeAllTestsHere
+    makeAllTestsHere,
+    getTestT
     ) where
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.Meta.Parse
+import Language.Haskell.Meta.Utils
 import Data.List
 import Data.Either
-import Data.Maybe (fromJust)
 
 data TestT = TestT {
-  valueTest :: [[String]], -- list of list of args
+  valueTest :: [String], -- list of args
   resTest :: [String], -- list of results
   testF :: String,
   actualU :: Int
@@ -106,15 +107,15 @@ buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s
   where
     nxs = x {valueTest = tail valueTest', resTest = tail resTest', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
-    norm = either (const $ liftString "Failed to parse") return $ parseExp $ head resTest' -- For now only integer
-    res = (appRec (reverse (head valueTest'), (varE $ mkName testF')))
+    norm = either (const $ liftString "Failed to parse") return $ parseExp $ head resTest'
+    res = (either (const $ liftString "Failed to parse") (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF'))) $ parseExp  $ head valueTest')
     guar1 = do
       a <- appE (appE ([| (==) |]) norm) res
-      b <- appE [e|Right|] $ litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " == " ++ (head resTest')))
+      b <- appE [e|Right|] $ litE (stringL (testF' ++ " " ++ (head valueTest') ++ " == " ++ (head resTest')))
       return (NormalG a,b)
     guar2 = do
       a <- [e|otherwise|]
-      b <- appE [e|Left|] $ appE (appE [e|(++)|] (litE (stringL (testF' ++ " " ++ unwords (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT == ")))) (appE [e|show|] res)
+      b <- appE [e|Left|] $ appE (appE [e|(++)|] (litE (stringL (testF' ++ " " ++ (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT == ")))) (appE [e|show|] res)
       return (NormalG a,b)
     fbody = guardedB [guar1,guar2]
     fClause = clause [] fbody []
@@ -134,9 +135,9 @@ runTests str funcs_runned = funD fname [fClause]
     boo = [e|countRight' == length'|]
     fClause = clause [] (normalB (tupE [ex,boo])) [cr,len]
 
-appRec :: ([String],Q Exp) -> Q Exp
+appRec :: ([Exp],Exp) -> Exp
 appRec ([],a) = a
-appRec ((x:xs),b) = appE (appRec (xs,b)) (either (const $ liftString "Failed to parse") return $ parseExp x)
+appRec ((x:xs),a) = AppE (appRec (xs,a)) x
 
 -- Run all declarations and store them into a tab
 appRecDec :: [Dec] -> [Q Exp]
@@ -164,20 +165,11 @@ getTestT' (x:xs) b t
   | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (TestT [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
-    list = words' $ drop 3 (init x)
-    args = if length list == 1 then [] else init list
-    res = last list
+    (fa,fb) = parenC x 0 (-1,0)
+    (sa,sb) = parenC x (fb+1) (-1,0)
+    args = if (sa,sb) == (0,0) then [] else drop (fa+1) $ take fb x
+    res = drop (sa+1) $ take (sb) x
     hw = head (words x)
-
-words' :: String -> [String]
-words' [] = []
-words' str
-  | "(" `isPrefixOf` str = a : words' (if null b then [] else tail b)
-  | otherwise = head w : words' (unwords (tail w))
-  where
-    w = words str
-    (_,ind) = parenPairs str
-    (a,b) = splitAt (ind+1) str
 
 replaceXbyY :: String -> Char -> Char -> String
 replaceXbyY [] _ _ = []
@@ -185,11 +177,10 @@ replaceXbyY (x:xs) a b
   | x == a = b:replaceXbyY xs a b
   | otherwise = x : replaceXbyY xs a b
 
-parenPairs :: String -> (Int, Int)
-parenPairs = go 0 []
-  where
-    go _ _ [] = (0,0) --Maybe encapsulate with Maybe
-    go j acc ('(' : cs) = go (j + 1) (j : acc) cs
-    go j [] (')' : cs) = go (j + 1) [] cs -- unbalanced parentheses!
-    go j (i : is) (')' : cs) = (i, j) -- : go (j + 1) is cs
-    go j acc (c : cs) = go (j + 1) acc cs
+-- To be call with 0 (-1,0)
+parenC :: String -> Int -> (Int,Int) -> (Int, Int)
+parenC str pos t@(i,j)
+  | pos >= length str = (0,0)
+  | str!!pos == '[' = parenC str (pos+1) ((if i== -1 then pos else i),j-1)
+  | str!!pos == ']' = if j== -1 then (i,pos) else parenC str (pos+1) (i,j+1)
+  | otherwise = parenC str (pos+1) t
