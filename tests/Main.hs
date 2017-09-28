@@ -16,8 +16,6 @@ main = do
   let (str,res) = _TEST_tests_Main
   putStrLn str
   if res then exitSuccess else exitFailure
-  {- p <- readFile ("/home/nobrakal/Documents/prog/testCom/tests/Main.hs")
-  print $ getTestT p -}
 
 --[1 2] [3]
 add :: Int -> Int -> Int

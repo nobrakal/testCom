@@ -108,14 +108,14 @@ buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s
     nxs = x {valueTest = tail valueTest', resTest = tail resTest', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
     norm = either (const $ liftString "Failed to parse") return $ parseExp $ head resTest'
-    res = (either (const $ liftString "Failed to parse") (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF'))) $ parseExp  $ head valueTest')
+    res = if null (head valueTest') then varE $ mkName testF' else either (const $ liftString "Failed to parse") (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF'))) $ parseExp  $ head valueTest'
     guar1 = do
       a <- appE (appE ([| (==) |]) norm) res
-      b <- appE [e|Right|] $ litE (stringL (testF' ++ " " ++ (head valueTest') ++ " == " ++ (head resTest')))
+      b <- appE [e|Right|] $ liftString (testF' ++ (if null (head valueTest') then [] else " ") ++ (head valueTest') ++ " == " ++ (head resTest'))
       return (NormalG a,b)
     guar2 = do
       a <- [e|otherwise|]
-      b <- appE [e|Left|] $ appE (appE [e|(++)|] (litE (stringL (testF' ++ " " ++ (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT == ")))) (appE [e|show|] res)
+      b <- appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT == "))) (appE [e|show|] res)
       return (NormalG a,b)
     fbody = guardedB [guar1,guar2]
     fClause = clause [] fbody []
@@ -167,8 +167,10 @@ getTestT' (x:xs) b t
   where
     (fa,fb) = parenC x 0 (-1,0)
     (sa,sb) = parenC x (fb+1) (-1,0)
-    args = if (sa,sb) == (0,0) then [] else drop (fa+1) $ take fb x
-    res = drop (sa+1) $ take (sb) x
+    args' = drop (fa+1) $ take fb x
+    res' = drop (sa+1) $ take (sb) x
+    args = if (sa,sb) == (0,0) then [] else args'
+    res = if (sa,sb) == (0,0) then args' else res'
     hw = head (words x)
 
 replaceXbyY :: String -> Char -> Char -> String
