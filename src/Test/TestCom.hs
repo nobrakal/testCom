@@ -4,7 +4,8 @@
   In any file, you can specify tests above a function declaration, like:
 
   @
-  --[1 2 3]
+  --[list of args] [exceptedResult]
+  --[1 2] [3]
   add x y = x+y
   @
 
@@ -44,8 +45,8 @@
   Considering the given file:
 
   @
-  --[1 2 3]
-  --[1 2 4]
+  --[1 2] [3]
+  --[1 2] [4]
   add x y = x+y
   @
 
@@ -61,8 +62,7 @@
 
 module Test.TestCom
     (makeAllTests,
-    makeAllTestsHere,
-    getTestT
+    makeAllTestsHere
     ) where
 
 import Language.Haskell.TH

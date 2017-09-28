@@ -7,7 +7,7 @@
 Above a function to test, write your test like this:
 
 ```
---[1 2 3]
+--[1 2] [3]
 add :: Int -> Int -> Int
 add x y = x+y
 ```
