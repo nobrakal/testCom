@@ -59,7 +59,6 @@
 
  -}
 
-
 module Test.TestCom
     (makeAllTests,
     makeAllTestsHere
