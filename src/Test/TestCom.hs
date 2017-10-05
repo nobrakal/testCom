@@ -9,6 +9,14 @@
   add x y = x+y
   @
 
+  OR
+
+  @
+  --O[list of expression with the same type that the result] [exceptedResult]
+  --O[add 1 2] [3]
+  add x y = x+y
+  @
+
   You can use any object deriving from Show and Eq as an argument for tests.
   Later, on your test file, you can build tests functions with
 
@@ -72,7 +80,7 @@ import Data.List
 import Data.Either
 
 data TestT = TestT {
-  valueTest :: [String], -- list of args
+  valueTest :: [(Bool,String)], -- list of (is the test normal,args)
   resTest :: [String], -- list of results
   testF :: String,
   actualU :: Int
@@ -102,23 +110,24 @@ makeAllTestsHere = do
 
 buildTests' :: String -> TestT -> [Q Dec]
 buildTests' _ (TestT [] [] _ _) = []
-buildTests' s x@(TestT valueTest' resTest' testF' actualU') = nd : buildTests' s nxs
+buildTests' s x@(TestT ((actB,actV):valueTest') (actRes:resTest') testF' actualU') = nd : buildTests' s nxs
   where
-    nxs = x {valueTest = tail valueTest', resTest = tail resTest', actualU = actualU'+1}
+    nxs = x {valueTest = valueTest', resTest = resTest', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
-    norm = either (const $ liftString "Failed to parse") return $ parseExp $ head resTest'
-    res = if null (head valueTest') then varE $ mkName testF' else either (const $ liftString "Failed to parse") (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF'))) $ parseExp  $ head valueTest'
+    norm = eith return $ parseExp actRes
+    res = if not actB then eith return $ parseExp $ actV else if null (actV) then varE $ mkName testF' else eith (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF'))) $ parseExp  $ actV
     guar1 = do
       a <- appE (appE ([| (==) |]) norm) res
-      b <- appE [e|Right|] $ liftString (testF' ++ (if null (head valueTest') then [] else " ") ++ (head valueTest') ++ " == " ++ (head resTest'))
+      b <- appE [e|Right|] $ liftString ((if not actB then [] else testF') ++ (if (null (actV)) || (not actB) then [] else " ") ++ actV  ++ " == " ++ actRes)
       return (NormalG a,b)
     guar2 = do
       a <- [e|otherwise|]
-      b <- appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ (head valueTest') ++ " /= " ++ (head resTest') ++ " BUT == "))) (appE [e|show|] res)
+      b <- appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ actV ++ " /= " ++ actRes ++ " BUT == "))) (appE [e|show|] res)
       return (NormalG a,b)
     fbody = guardedB [guar1,guar2]
     fClause = clause [] fbody []
     nd = funD fname [fClause]
+    eith = either (const $ liftString "Failed to parse")
 
 buildTests :: String -> [TestT] -> [Q Dec]
 buildTests _ [] = []
@@ -160,7 +169,8 @@ getTestT str = getTestT' (lines str) False (TestT [] [] [] 0)
 getTestT' :: [String] -> Bool -> TestT -> [TestT]
 getTestT' [] _ _ = []
 getTestT' (x:xs) b t
-  | "--[" `isPrefixOf` x && "]" `isSuffixOf` x = getTestT' xs True $ t {valueTest = args : (valueTest t), resTest = res : (resTest t)}
+  | "--" `isPrefixOf` x && isStartingWith (drop 2 x) "[" && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (True,args) : (valueTest t), resTest = res : (resTest t)})
+  | "--" `isPrefixOf` x && isStartingWith (drop 2 x) "O[" && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (False,args) : (valueTest t), resTest = res : (resTest t)})
   | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (TestT [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
@@ -171,6 +181,14 @@ getTestT' (x:xs) b t
     args = if (sa,sb) == (0,0) then [] else args'
     res = if (sa,sb) == (0,0) then args' else res'
     hw = head (words x)
+
+isStartingWith :: String -> String -> Bool
+isStartingWith [] _ = False
+isStartingWith _ [] = True
+isStartingWith (x:xs) s@(x':xs')
+  | x == ' ' = isStartingWith xs s
+  | x == x' = True && isStartingWith xs xs'
+  | otherwise = False
 
 replaceXbyY :: String -> Char -> Char -> String
 replaceXbyY [] _ _ = []

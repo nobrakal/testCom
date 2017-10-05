@@ -37,7 +37,8 @@ add''' x y = x ++ y
 add'''' :: (Int -> Int -> Int) -> Int -> Int -> Int
 add'''' f a b = f a b
 
---[2]
+-- [2]
+-- O[onlyOne][2]
 onlyOne :: Int
 onlyOne = 2
 
