@@ -79,8 +79,10 @@ import Language.Haskell.Meta.Utils
 import Data.List
 import Data.Either
 
-data TestT = TestT {
-  valueTest :: [(Bool,String)], -- list of (is the test normal,args)
+data TestType = Normal | Override deriving (Show, Eq)
+
+data Test = Test {
+  valueTest :: [(TestType,String)], -- list of (is the test normal,args)
   resTest :: [String], -- list of results
   testF :: String,
   actualU :: Int
@@ -108,28 +110,36 @@ makeAllTestsHere = do
   loc <- location >>= (\(Loc y _ _ _ _) -> return y)
   makeAllTests loc
 
-buildTests' :: String -> TestT -> [Q Dec]
-buildTests' _ (TestT [] [] _ _) = []
-buildTests' s x@(TestT ((actB,actV):valueTest') (actRes:resTest') testF' actualU') = nd : buildTests' s nxs
+buildTests' :: String -> Test -> [Q Dec]
+buildTests' _ (Test [] [] _ _) = []
+buildTests' s x@(Test ((actB,actV):valueTest') (actRes:resTest') testF' actualU') = nd : buildTests' s nxs
   where
     nxs = x {valueTest = valueTest', resTest = resTest', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
-    norm = eith return $ parseExp actRes
-    res = if not actB then eith return $ parseExp $ actV else if null (actV) then varE $ mkName testF' else eith (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF'))) $ parseExp  $ actV
+    res = calculatedRes (actB,actV) testF'
     guar1 = do
-      a <- appE (appE ([| (==) |]) norm) res
-      b <- appE [e|Right|] $ liftString ((if not actB then [] else testF') ++ (if (null (actV)) || (not actB) then [] else " ") ++ actV  ++ " == " ++ actRes)
+      a <- appE (appE ([| (==) |]) (eith return $ parseExp actRes)) res
+      b <- appE [e|Right|] $ liftString ((if isNormal then [] else testF') ++ (if (null (actV)) || isNormal then [] else " ") ++ actV  ++ " == " ++ actRes)
       return (NormalG a,b)
     guar2 = do
       a <- [e|otherwise|]
       b <- appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ actV ++ " /= " ++ actRes ++ " BUT == "))) (appE [e|show|] res)
       return (NormalG a,b)
-    fbody = guardedB [guar1,guar2]
-    fClause = clause [] fbody []
+    fClause = clause [] (guardedB [guar1,guar2]) []
     nd = funD fname [fClause]
-    eith = either (const $ liftString "Failed to parse")
+    isNormal = case actB of
+      Normal -> True
+      otherwise -> False
 
-buildTests :: String -> [TestT] -> [Q Dec]
+eith = either (const $ liftString "Failed to parse")
+
+calculatedRes :: (TestType,String) -> String -> ExpQ
+calculatedRes (Normal,actV) testF
+  | null (actV) = varE $ mkName testF
+  | otherwise = eith (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF))) $ parseExp $ actV
+calculatedRes (Override,actV) _ = eith return $ parseExp $ actV
+
+buildTests :: String -> [Test] -> [Q Dec]
 buildTests _ [] = []
 buildTests s (x:xs) = (buildTests' s x) ++ (buildTests s xs)
 
@@ -162,18 +172,19 @@ builFinalString (x:xs) = (either ("Error: " ++ ) ("Test passed: " ++) x ): builF
 countRight :: [Either a b] -> Int
 countRight z = foldl (\x y -> if isLeft y then x else x+1) (0 :: Int) z
 
-getTestT :: String -> [TestT]
-getTestT str = getTestT' (lines str) False (TestT [] [] [] 0)
+getTestT :: String -> [Test]
+getTestT str = getTestT' (lines str) False (Test [] [] [] 0)
 
 -- t is supposed non empty
-getTestT' :: [String] -> Bool -> TestT -> [TestT]
+getTestT' :: [String] -> Bool -> Test -> [Test]
 getTestT' [] _ _ = []
 getTestT' (x:xs) b t
-  | "--" `isPrefixOf` x && (isStartingWith (drop 2 x) "[" || isO ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = ((not isO),args) : (valueTest t), resTest = res : (resTest t)})
-  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (TestT [] [] [] 0)
+  | "--" `isPrefixOf` x && (isStartingWith (drop 2 x) "[" || isO ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (tesT,args) : (valueTest t), resTest = res : (resTest t)})
+  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (Test [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
     isO = isStartingWith (drop 2 x) "O["
+    tesT = if isO then Override else Normal
     (fa,fb) = parenC x 0 (-1,0)
     (sa,sb) = parenC x (fb+1) (-1,0)
     args' = drop (fa+1) $ take fb x
