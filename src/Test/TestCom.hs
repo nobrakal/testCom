@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {- | ==Usage
 
+  === Write your tests
+
   In any file, you can specify tests above a function declaration, like:
 
   @
@@ -12,12 +14,25 @@
   OR
 
   @
-  --O[list of expression with the same type that the result] [exceptedResult]
+  --O[list of expression with the same type than the result] [exceptedResult]
   --O[add 1 2] [3]
   add x y = x+y
   @
 
+  OR
+
+  @
+  --S[expressionInvolvingYourFunction] [OtherExpression] [Integer]
+  --S[add @x @y] [@x+@y]
+  add x y = x+y
+  @
+
+  Here, testCom will build N tests with random arguments.
+
   You can use any object deriving from Show and Eq as an argument for tests.
+
+  === Build your tests
+
   Later, on your test file, you can build tests functions with
 
   @
@@ -79,7 +94,7 @@ import Language.Haskell.Meta.Utils
 import Data.List
 import Data.Either
 
-data TestType = Normal | Override deriving (Show, Eq)
+data TestType = Normal | Override | Spec deriving (Show, Eq)
 
 data Test = Test {
   valueTest :: [(TestType,String)], -- list of (is the test normal,args)
@@ -179,12 +194,12 @@ getTestT str = getTestT' (lines str) False (Test [] [] [] 0)
 getTestT' :: [String] -> Bool -> Test -> [Test]
 getTestT' [] _ _ = []
 getTestT' (x:xs) b t
-  | "--" `isPrefixOf` x && (isStartingWith (drop 2 x) "[" || isO ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (tesT,args) : (valueTest t), resTest = res : (resTest t)})
+  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (tesT,args) : (valueTest t), resTest = res : (resTest t)})
   | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (Test [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
-    isO = isStartingWith (drop 2 x) "O["
-    tesT = if isO then Override else Normal
+    isStartingWith' = isStartingWith (drop 2 x)
+    tesT = if isStartingWith' "[" then Normal else if isStartingWith' "O[" then Override else Spec
     (fa,fb) = parenC x 0 (-1,0)
     (sa,sb) = parenC x (fb+1) (-1,0)
     args' = drop (fa+1) $ take fb x
