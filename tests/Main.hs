@@ -33,7 +33,7 @@ add'' (x,y) (x',y') = (x+x',y+y')
 add''' :: [Int] -> [Int] -> [Int]
 add''' x y = x ++ y
 
---[add 1 2] [5]
+--[add 1 2] [3]
 add'''' :: (Int -> Int -> Int) -> Int -> Int -> Int
 add'''' f a b = f a b
 
