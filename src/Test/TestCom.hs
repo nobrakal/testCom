@@ -169,11 +169,11 @@ getTestT str = getTestT' (lines str) False (TestT [] [] [] 0)
 getTestT' :: [String] -> Bool -> TestT -> [TestT]
 getTestT' [] _ _ = []
 getTestT' (x:xs) b t
-  | "--" `isPrefixOf` x && isStartingWith (drop 2 x) "[" && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (True,args) : (valueTest t), resTest = res : (resTest t)})
-  | "--" `isPrefixOf` x && isStartingWith (drop 2 x) "O[" && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (False,args) : (valueTest t), resTest = res : (resTest t)})
+  | "--" `isPrefixOf` x && (isStartingWith (drop 2 x) "[" || isO ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = ((not isO),args) : (valueTest t), resTest = res : (resTest t)})
   | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (TestT [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
+    isO = isStartingWith (drop 2 x) "O["
     (fa,fb) = parenC x 0 (-1,0)
     (sa,sb) = parenC x (fb+1) (-1,0)
     args' = drop (fa+1) $ take fb x
