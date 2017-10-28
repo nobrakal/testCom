@@ -133,9 +133,9 @@ makeAllTestsHere = do
 
 buildTests' :: String -> Test -> [Q Dec]
 buildTests' _ (Test [] _ _) = []
-buildTests' s x@(Test ((TestUnit actB actV actRes _):testU') testF' actualU') = nd : buildTests' s nxs
+buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actualU') = nd : buildTests' s nxs
   where
-    nxs = x {testU = testU', actualU = actualU'+1}
+    nxs = (if numOfT == 1 then x {testU = testU'} else x {testU = (t {numOfTests = numOfT-1}):testU'}) {actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
     res = calculatedRes (actB,actV) testF'
     actRes' = actResByTestType actB actRes
@@ -212,7 +212,7 @@ getTestT' (x:xs) b t
   where
     isStartingWith' = isStartingWith (drop 2 x)
     tesT = if isStartingWith' "[" then Normal else if isStartingWith' "O[" then Override else Spec
-    nbOfTests = if tesT == Spec then read (drop (fa+1) $ take (fb) x) else 1
+    nbOfTests = if tesT == Spec then read (drop (ta+1) $ take (tb) x) else 1
     (fa,fb) = parenC x 0 (-1,0)
     (sa,sb) = parenC x (fb+1) (-1,0)
     (ta,tb) = parenC x (sb+1) (-1,0)
