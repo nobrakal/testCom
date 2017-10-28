@@ -23,7 +23,7 @@
 
   @
   --S[expressionInvolvingYourFunction] [OtherExpression] [Integer]
-  --S[add @x @y] [@x+@y]
+  --S[@x @y] [@x+@y] [100]
   add x y = x+y
   @
 
@@ -97,7 +97,7 @@ import Data.Either
 data TestType = Normal | Override | Spec deriving (Show, Eq)
 
 data Test = Test {
-  valueTest :: [(TestType,String)], -- list of (is the test normal,args)
+  valueTest :: [(TestType,String,Int)], -- list of (is the test normal,args) and the number of tests to do.
   resTest :: [String], -- list of results
   testF :: String,
   actualU :: Int
@@ -127,13 +127,14 @@ makeAllTestsHere = do
 
 buildTests' :: String -> Test -> [Q Dec]
 buildTests' _ (Test [] [] _ _) = []
-buildTests' s x@(Test ((actB,actV):valueTest') (actRes:resTest') testF' actualU') = nd : buildTests' s nxs
+buildTests' s x@(Test ((actB,actV,_):valueTest') (actRes:resTest') testF' actualU') = nd : buildTests' s nxs
   where
     nxs = x {valueTest = valueTest', resTest = resTest', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
     res = calculatedRes (actB,actV) testF'
+    actRes' = actResByTestType actB actRes
     guar1 = do
-      a <- appE (appE ([| (==) |]) (eith return $ parseExp actRes)) res
+      a <- appE (appE ([| (==) |]) actRes') res
       b <- appE [e|Right|] $ liftString ((if isNormal then [] else testF') ++ (if (null (actV)) || isNormal then [] else " ") ++ actV  ++ " == " ++ actRes)
       return (NormalG a,b)
     guar2 = do
@@ -146,13 +147,18 @@ buildTests' s x@(Test ((actB,actV):valueTest') (actRes:resTest') testF' actualU'
       Normal -> True
       otherwise -> False
 
-eith = either (const $ liftString "Failed to parse")
+eith = either (\x -> liftString $ "Failed to parse" ++ show x)
 
 calculatedRes :: (TestType,String) -> String -> ExpQ
 calculatedRes (Normal,actV) testF
   | null (actV) = varE $ mkName testF
   | otherwise = eith (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF))) $ parseExp $ actV
 calculatedRes (Override,actV) _ = eith return $ parseExp $ actV
+calculatedRes (Spec,actV) _ = [e|True|]
+
+actResByTestType :: TestType -> String -> ExpQ
+actResByTestType Spec ar = [e|True|]
+actResByTestType _ ar = eith return $ parseExp ar
 
 buildTests :: String -> [Test] -> [Q Dec]
 buildTests _ [] = []
@@ -194,16 +200,18 @@ getTestT str = getTestT' (lines str) False (Test [] [] [] 0)
 getTestT' :: [String] -> Bool -> Test -> [Test]
 getTestT' [] _ _ = []
 getTestT' (x:xs) b t
-  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (tesT,args) : (valueTest t), resTest = res : (resTest t)})
+  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (tesT,args,nbOfTests) : (valueTest t), resTest = res : (resTest t)})
   | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (Test [] [] [] 0)
   | otherwise = getTestT' xs b t
   where
     isStartingWith' = isStartingWith (drop 2 x)
     tesT = if isStartingWith' "[" then Normal else if isStartingWith' "O[" then Override else Spec
+    nbOfTests = if tesT == Spec then read (drop (fa+1) $ take (fb) x) else 1
     (fa,fb) = parenC x 0 (-1,0)
     (sa,sb) = parenC x (fb+1) (-1,0)
+    (ta,tb) = parenC x (sb+1) (-1,0)
     args' = drop (fa+1) $ take fb x
-    res' = drop (sa+1) $ take (sb) x
+    res' = drop (sa+1) $ take sb x
     args = if (sa,sb) == (0,0) then [] else args'
     res = if (sa,sb) == (0,0) then args' else res'
     hw = head (words x)
