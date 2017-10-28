@@ -137,21 +137,25 @@ buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actua
   where
     nxs = (if numOfT == 1 then x {testU = testU'} else x {testU = (t {numOfTests = numOfT-1}):testU'}) {actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
-    res = calculatedRes (actB,actV) testF'
-    actRes' = actResByTestType actB actRes
+    res = actV' >>= \x -> calculatedRes (actB,x) testF'
+    actRes'' = actRes' >>= actResByTestType actB
+    (actV',actRes') = if actB == Spec then makeRandom actV actRes testF' else (return actV, return actRes)
     guar1 = do
-      a <- appE (appE ([| (==) |]) actRes') res
-      b <- appE [e|Right|] $ liftString ((if isNormal then [] else testF') ++ (if (null (actV)) || isNormal then [] else " ") ++ actV  ++ " == " ++ actRes)
+      a <- appE (appE ([| (==) |]) actRes'') res
+      b <- actV' >>= \x -> actRes' >>= \y -> (appE [e|Right|] $ liftString ((if isNormal then [] else testF') ++ (if (null (x)) || isNormal then [] else " ") ++ x  ++ " == " ++ y))
       return (NormalG a,b)
     guar2 = do
       a <- [e|otherwise|]
-      b <- appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ actV ++ " /= " ++ actRes ++ " BUT == "))) (appE [e|show|] res)
+      b <- actV' >>= \x -> actRes' >>= \z ->( appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ x ++ " /= " ++ z ++ " BUT == "))) (appE [e|show|] res))
       return (NormalG a,b)
     fClause = clause [] (guardedB [guar1,guar2]) []
     nd = funD fname [fClause]
     isNormal = case actB of
       Normal -> True
       otherwise -> False
+
+makeRandom :: String -> String -> String -> (Q String, Q String)
+makeRandom first second fName = (return first,return second)
 
 eith = either (\x -> liftString $ "Failed to parse" ++ show x)
 

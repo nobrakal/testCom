@@ -18,7 +18,7 @@ main = do
   if res then exitSuccess else exitFailure
 
 --[1 2] [3]
---S[@x @y] [@x+@y] [100]
+--S[@x @y] [@x+@y] [10]
 add :: Int -> Int -> Int
 add x y = x+y
 
