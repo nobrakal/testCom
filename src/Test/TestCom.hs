@@ -96,9 +96,15 @@ import Data.Either
 
 data TestType = Normal | Override | Spec deriving (Show, Eq)
 
+data TestUnit = TestUnit {
+  typeOfT :: TestType,
+  args :: String,
+  result :: String,
+  numOfTests :: Int
+} deriving (Show)
+
 data Test = Test {
-  valueTest :: [(TestType,String,Int)], -- list of (is the test normal,args) and the number of tests to do.
-  resTest :: [String], -- list of results
+  testU :: [TestUnit], -- list of (is the test normal,args) and the number of tests to do.
   testF :: String,
   actualU :: Int
 } deriving (Show)
@@ -126,10 +132,10 @@ makeAllTestsHere = do
   makeAllTests loc
 
 buildTests' :: String -> Test -> [Q Dec]
-buildTests' _ (Test [] [] _ _) = []
-buildTests' s x@(Test ((actB,actV,_):valueTest') (actRes:resTest') testF' actualU') = nd : buildTests' s nxs
+buildTests' _ (Test [] _ _) = []
+buildTests' s x@(Test ((TestUnit actB actV actRes _):testU') testF' actualU') = nd : buildTests' s nxs
   where
-    nxs = x {valueTest = valueTest', resTest = resTest', actualU = actualU'+1}
+    nxs = x {testU = testU', actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
     res = calculatedRes (actB,actV) testF'
     actRes' = actResByTestType actB actRes
@@ -194,14 +200,14 @@ countRight :: [Either a b] -> Int
 countRight z = foldl (\x y -> if isLeft y then x else x+1) (0 :: Int) z
 
 getTestT :: String -> [Test]
-getTestT str = getTestT' (lines str) False (Test [] [] [] 0)
+getTestT str = getTestT' (lines str) False (Test [] [] 0)
 
 -- t is supposed non empty
 getTestT' :: [String] -> Bool -> Test -> [Test]
 getTestT' [] _ _ = []
 getTestT' (x:xs) b t
-  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {valueTest = (tesT,args,nbOfTests) : (valueTest t), resTest = res : (resTest t)})
-  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (Test [] [] [] 0)
+  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {testU = (TestUnit tesT args res nbOfTests) : (testU t)})
+  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (Test [] [] 0)
   | otherwise = getTestT' xs b t
   where
     isStartingWith' = isStartingWith (drop 2 x)
