@@ -9,6 +9,7 @@ Above a function to test, write your test like this:
 ```
 --[1 2] [3]
 --O[add 1 2] [3]
+--S[add x@Int y@Int] [x@ + y@] [10]
 add :: Int -> Int -> Int
 add x y = x+y
 ```

@@ -2,7 +2,8 @@
 {- | ==Usage
 
   === Write your tests
-
+  You can use any object deriving from Show and Eq as an argument for tests.
+  ==== Normal Tests
   In any file, you can specify tests above a function declaration, like:
 
   @
@@ -11,25 +12,24 @@
   add x y = x+y
   @
 
-  OR
+  ==== Overrided tests
+  With this syntax, testCom will only compare the two provided expression
 
   @
-  --O[list of expression with the same type than the result] [exceptedResult]
+  --O[Expression with the same type than the result] [exceptedResult]
   --O[add 1 2] [3]
   add x y = x+y
   @
 
-  OR
+  ==== Tests by specification
 
   @
   --S[expressionInvolvingYourFunction] [OtherExpression] [Integer]
-  --S[x@Int y@Int] [@x + @y] [100]
+  --S[x@Int y@Int] [x@ + y@] [100]
   add x y = x+y
   @
 
-  Here, testCom will build N tests with random arguments (specified by nameOfTheArgs@Type).
-
-  You can use any object deriving from Show and Eq as an argument for tests.
+  Here, testCom will build N tests with random arguments (specified by nameOfTheArgs@Type). Random arguments MUST be separated by spaces. For now, only base types are supported: Char, Int and Bool
 
   === Build your tests
 
@@ -94,7 +94,6 @@ import Language.Haskell.Meta.Utils
 import Data.List
 import Data.Either
 import Data.Maybe (fromJust)
-import Data.Dynamic
 import System.Random
 
 data TestType = Normal | Override | Spec deriving (Show, Eq)
@@ -177,11 +176,12 @@ generateRandomVars [] = []
 generateRandomVars ((name,typ):xs) = do
   res : generateRandomVars xs
   where
+    paren x= return $ "(" ++ show x ++ ")"
     res = do
       value <- case typ of
-                "Int" -> runIO $ (randomIO :: IO Int) >>= return . show
-                "Bool" -> runIO $ (randomIO :: IO Bool) >>= return . show
-                "Char" -> runIO $ (randomIO :: IO Char) >>= return . show
+                "Int" -> runIO $ (randomIO :: IO Int) >>= paren
+                "Bool" -> runIO $ (randomIO :: IO Bool) >>= paren
+                "Char" -> runIO $ (randomIO :: IO Char) >>=  paren
       return (name,value)
 
 

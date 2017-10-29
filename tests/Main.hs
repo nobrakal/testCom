@@ -17,16 +17,17 @@ main = do
   putStrLn str
   if res then exitSuccess else exitFailure
 
---S[x@Bool y@Bool] [x@ && y@] [10]
+--S[x@Bool y@Bool] [x@ && y@] [1]
 and' :: Bool -> Bool -> Bool
 and' x y = x && y
 
 --[1 2] [3]
+--[1 (-2)] [-1]
+--S[x@Int y@Int] [ x@ + y@ ] [10]
 add :: Int -> Int -> Int
 add x y = x+y
 
 --['a' 'b'] ["ab"]
---S[x@Char y@Char] [[ x@ , y@ ]] [10]
 add' :: Char -> Char -> String
 add' x y = [x,y]
 
