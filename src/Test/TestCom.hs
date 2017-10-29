@@ -142,7 +142,7 @@ buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actua
                                             let r1 = actResByTestType actB y
                                             let r2 = calculatedRes (actB,x) testF'
                                             a1 <- appE (appE ([| (==) |]) r1) r2
-                                            b1 <- (appE [e|Right|] $ liftString ((if isNormal then [] else testF') ++ (if (null (x)) || isNormal then [] else " ") ++ x  ++ " == " ++ y))
+                                            b1 <- (appE [e|Right|] $ liftString ((if not isNormal then [] else testF') ++ (if (null (x)) || not isNormal then [] else " ") ++ x  ++ " == " ++ y))
                                             a2 <- [e|otherwise|]
                                             b2 <- ( appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ x ++ " /= " ++ y ++ " BUT == "))) (appE [e|show|] r2))
                                             return (return (NormalG a1, b1), return (NormalG a2,b2))
