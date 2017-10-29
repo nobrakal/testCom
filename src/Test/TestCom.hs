@@ -23,11 +23,11 @@
 
   @
   --S[expressionInvolvingYourFunction] [OtherExpression] [Integer]
-  --S[x@Int y@Int] [x+y] [100]
+  --S[x@Int y@Int] [@x + @y] [100]
   add x y = x+y
   @
 
-  Here, testCom will build N tests with random arguments.
+  Here, testCom will build N tests with random arguments (specified by nameOfTheArgs@Type).
 
   You can use any object deriving from Show and Eq as an argument for tests.
 
@@ -136,26 +136,24 @@ makeAllTestsHere = do
 
 buildTests' :: String -> Test -> [Q Dec]
 buildTests' _ (Test [] _ _) = []
-buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actualU') = nd : buildTests' s nxs
+buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actualU') = do
+  let actAndResQ = if actB == Spec then makeRandom actV actRes testF' else return (actV, actRes)
+  let guar1And2 = actAndResQ >>= \(x,y) -> do
+                                            let r1 = actResByTestType actB y
+                                            let r2 = calculatedRes (actB,x) testF'
+                                            a1 <- appE (appE ([| (==) |]) r1) r2
+                                            b1 <- (appE [e|Right|] $ liftString ((if isNormal then [] else testF') ++ (if (null (x)) || isNormal then [] else " ") ++ x  ++ " == " ++ y))
+                                            a2 <- [e|otherwise|]
+                                            b2 <- ( appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ x ++ " /= " ++ y ++ " BUT == "))) (appE [e|show|] r2))
+                                            return (return (NormalG a1, b1), return (NormalG a2,b2))
+  let fClause = guar1And2 >>= \(guar1,guar2) -> clause [] (guardedB [guar1,guar2]) []
+  (funD fname [fClause]) : buildTests' s nxs
   where
     nxs = (if numOfT == 1 then x {testU = testU'} else x {testU = (t {numOfTests = numOfT-1}):testU'}) {actualU = actualU'+1}
     fname = mkName $ "_TEST_"++ s ++ testF' ++ show actualU' -- Tests have name like _TEST_funcnameX
-    res = actAndResQ >>= \(x,_) -> calculatedRes (actB,x) testF'
-    actRes'' = actAndResQ >>= \(_,x) -> actResByTestType actB x
-    actAndResQ = if actB == Spec then makeRandom actV actRes testF' else return (actV, actRes)
-    guar1 = do
-      a <- appE (appE ([| (==) |]) actRes'') res
-      b <- actAndResQ >>= \(x,y) -> (appE [e|Right|] $ liftString ((if isNormal then [] else testF') ++ (if (null (x)) || isNormal then [] else " ") ++ x  ++ " == " ++ y))
-      return (NormalG a,b)
-    guar2 = do
-      a <- [e|otherwise|]
-      b <- actAndResQ >>= \(x,y) ->( appE [e|Left|] $ appE (appE [e|(++)|] (liftString (testF' ++ " " ++ x ++ " /= " ++ y ++ " BUT == "))) (appE [e|show|] res))
-      return (NormalG a,b)
-    fClause = clause [] (guardedB [guar1,guar2]) []
-    nd = funD fname [fClause]
     isNormal = case actB of
-      Normal -> True
-      otherwise -> False
+      Override -> False
+      otherwise -> True
 
 makeRandom :: String -> String -> String -> Q(String, String)
 makeRandom first second fname = do

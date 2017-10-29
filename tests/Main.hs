@@ -26,6 +26,7 @@ add :: Int -> Int -> Int
 add x y = x+y
 
 --['a' 'b'] ["ab"]
+--S[x@Char y@Char] [[ x@ , y@ ]] [10]
 add' :: Char -> Char -> String
 add' x y = [x,y]
 
