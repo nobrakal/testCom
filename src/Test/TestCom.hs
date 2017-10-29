@@ -23,7 +23,7 @@
 
   @
   --S[expressionInvolvingYourFunction] [OtherExpression] [Integer]
-  --S[@x @y] [@x+@y] [100]
+  --S[x@Int y@Int] [x+y] [100]
   add x y = x+y
   @
 
@@ -93,6 +93,9 @@ import Language.Haskell.Meta.Parse
 import Language.Haskell.Meta.Utils
 import Data.List
 import Data.Either
+import Data.Maybe (fromJust)
+import Data.Dynamic
+import System.Random
 
 data TestType = Normal | Override | Spec deriving (Show, Eq)
 
@@ -155,19 +158,55 @@ buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actua
       otherwise -> False
 
 makeRandom :: String -> String -> String -> Q(String, String)
-makeRandom first second fname = return (first,second)
+makeRandom first second fname = do
+  newVars <- sequenceQ $ generateRandomVars $ extractVarsName first'
+  let first'' = unwords $ replaceVarsByValue first' (newVars)
+  let second' = unwords $ replaceVarsByValue (words second) (newVars)
+  return (first'',second')
+  where
+    first' = words first
+
+extractVarsName :: [String] -> [(String,String)]
+extractVarsName [] = []
+extractVarsName (x:xs)
+  | '@' `elem` x = (take posOfArobase x, drop (posOfArobase+1) x) : extractVarsName xs
+  | otherwise = extractVarsName xs
+  where
+    posOfArobase = fromJust $ elemIndex '@' x
+
+generateRandomVars :: [(String,String)] -> [Q (String,String)]
+generateRandomVars [] = []
+generateRandomVars ((name,typ):xs) = do
+  res : generateRandomVars xs
+  where
+    res = do
+      value <- case typ of
+                "Int" -> runIO $ (randomIO :: IO Int) >>= return . show
+                "Bool" -> runIO $ (randomIO :: IO Bool) >>= return . show
+                "Char" -> runIO $ (randomIO :: IO Char) >>= return . show
+      return (name,value)
+
+
+replaceVarsByValue :: [String] -> [(String,String)] -> [String]
+replaceVarsByValue [] _ = []
+replaceVarsByValue (x:xs) tab
+  | '@' `elem` x = case lookup (take posOfArobase x) tab of
+    Just a -> a :replaceVarsByValue xs tab
+    Nothing -> x : replaceVarsByValue xs tab
+  | otherwise = x : replaceVarsByValue xs tab
+  where
+    posOfArobase = fromJust $ elemIndex '@' x
 
 eith = either (\x -> liftString $ "Failed to parse" ++ show x)
 
 calculatedRes :: (TestType,String) -> String -> ExpQ
-calculatedRes (Normal,actV) testF
+calculatedRes (Override,actV) _ = eith return $ parseExp $ actV
+calculatedRes (_,actV) testF
   | null (actV) = varE $ mkName testF
   | otherwise = eith (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF))) $ parseExp $ actV
-calculatedRes (Override,actV) _ = eith return $ parseExp $ actV
-calculatedRes (Spec,actV) _ = [e|True|]
+--calculatedRes (Spec,actV) _ = [e|True|]
 
 actResByTestType :: TestType -> String -> ExpQ
-actResByTestType Spec ar = [e|True|]
 actResByTestType _ ar = eith return $ parseExp ar
 
 buildTests :: String -> [Test] -> [Q Dec]
