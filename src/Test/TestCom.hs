@@ -156,7 +156,7 @@ buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actua
 
 makeRandom :: String -> String -> String -> Q(String, String)
 makeRandom first second fname = do
-  newVars <- sequenceQ $ generateRandomVars $ extractVarsName first'
+  newVars <- sequenceQ $ generateRandomVars fname $ extractVarsName first'
   let first'' = unwords $ replaceVarsByValue first' (newVars)
   let second' = unwords $ replaceVarsByValue (words second) (newVars)
   return (first'',second')
@@ -171,17 +171,18 @@ extractVarsName (x:xs)
   where
     posOfArobase = fromJust $ elemIndex '@' x
 
-generateRandomVars :: [(String,String)] -> [Q (String,String)]
-generateRandomVars [] = []
-generateRandomVars ((name,typ):xs) = do
-  res : generateRandomVars xs
+generateRandomVars :: String -> [(String,String)] -> [Q (String,String)]
+generateRandomVars _ [] = []
+generateRandomVars fname ((name,typ):xs) = do
+  res : generateRandomVars fname xs
   where
     paren x= return $ "(" ++ show x ++ ")"
     res = do
       value <- case typ of
                 "Int" -> runIO $ (randomIO :: IO Int) >>= paren
                 "Bool" -> runIO $ (randomIO :: IO Bool) >>= paren
-                "Char" -> runIO $ (randomIO :: IO Char) >>=  paren
+                "Char" -> runIO $ (randomIO :: IO Char) >>= paren
+                otherwise -> fail $ "Bad type specified in the test of " ++ fname ++ " in the variable " ++ name ++ ": "++typ
       return (name,value)
 
 
@@ -195,7 +196,7 @@ replaceVarsByValue (x:xs) tab
   where
     posOfArobase = fromJust $ elemIndex '@' x
 
-eith = either (\x -> liftString $ "Failed to parse" ++ show x)
+eith = either (\x -> fail $ "Failed to parse:" ++ show x)
 
 calculatedRes :: (TestType,String) -> String -> ExpQ
 calculatedRes (Override,actV) _ = eith return $ parseExp $ actV
