@@ -236,7 +236,7 @@ getName (FunD name _ ) = name
 
 builFinalString :: [Either String String] -> [String]
 builFinalString [] = [""]
-builFinalString (x:xs) = (either ("Error: " ++ ) ("Test passed: " ++) x ): builFinalString xs
+builFinalString (x:xs) = (either ("Test Errored: " ++ ) ("Test passed: " ++) x ): builFinalString xs
 
 countRight :: [Either a b] -> Int
 countRight z = foldl (\x y -> if isLeft y then x else x+1) (0 :: Int) z

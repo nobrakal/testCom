@@ -4,15 +4,22 @@
 
 #### Write your tests
 
-Above a function to test, write your test like this:
+Above a function to test, write your tests like this:
 
 ```
 --[1 2] [3]
 --O[add 1 2] [3]
---S[add x@Int y@Int] [x@ + y@] [10]
+--S[x@Int y@Int] [x@ + y@] [10]
 add :: Int -> Int -> Int
 add x y = x+y
 ```
+
+#### Syntax
+
+* Without any prefix: [args For The Function] [ExpectedResult]
+* With a O (Override) prefix: [custom Function To Test] [ExpectedResult]
+* With a S (Specification) prefix: [args Involving variable@Type] [ExpectedResult Maybe Involving variable@] [numberOfTestToDo]
+(for now only basic types are supported: Int Char and Bool). variable@Type MUST be surrounded by spaces.
 
 #### Run them
 For example
@@ -35,7 +42,3 @@ main = do
   putStrLn str'
   if res && res' then exitSuccess else exitFailure
 ```
-
-### TODO
-
-* Encapuslate parse error.

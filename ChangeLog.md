@@ -1,5 +1,10 @@
 # Revision history for testCom
 
+## 0.3.0  -- 2017-10-31
+
+* Add test by specification
+* Parse error encapsulated
+
 ## 0.2.0  -- 2017-09-28
 
 * Can parse object correctly
