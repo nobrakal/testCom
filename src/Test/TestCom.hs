@@ -122,23 +122,21 @@ data Test = Test {
 -- This also create sub-functions that each produce a Eihter String String
 makeAllTests :: FilePath -> Q [Dec]
 makeAllTests str = do
-  let str' = (take ((length str)-3) (replaceXbyY str '/' '_'))
+  let str' = take ((length str)-3) $ replaceXbyY '/' '_' str
   file <- runIO $ readFile str
-  funcs <- sequenceQ (buildTests str' (getTestT file))
-  nd <- runTests str' $ appRecDec $ funcs
+  funcs <- sequenceQ $ concatMap (buildTests' str') $ getTestT file
+  nd <- runTests str' $ appRecDec funcs
   return (nd : funcs)
 
 makeAllTestsHere :: Q [Dec]
-makeAllTestsHere = do
-  loc <- location >>= (\(Loc y _ _ _ _) -> return y)
-  makeAllTests loc
+makeAllTestsHere = location >>= (\(Loc y _ _ _ _) -> return y) >>= makeAllTests
 
 buildTests' :: String -> Test -> [Q Dec]
 buildTests' _ (Test [] _ _) = []
 buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actualU') = do
   let actAndResQ = if actB == Spec then makeRandom actV actRes testF' else return (actV, actRes)
   let guar1And2 = actAndResQ >>= \(x,y) -> do
-                                            let r1 = actResByTestType actB y
+                                            let r1 = actResByTestType y
                                             let r2 = calculatedRes (actB,x) testF'
                                             a1 <- appE (appE ([| (==) |]) r1) r2
                                             b1 <- (appE [e|Right|] $ liftString ((if not isNormal then [] else testF') ++ (if (null (x)) || not isNormal then [] else " ") ++ x  ++ " == " ++ y))
@@ -156,67 +154,56 @@ buildTests' s x@(Test (t@(TestUnit actB actV actRes numOfT):testU') testF' actua
 
 makeRandom :: String -> String -> String -> Q(String, String)
 makeRandom first second fname = do
-  newVars <- sequenceQ $ generateRandomVars fname $ extractVarsName first'
-  let first'' = unwords $ replaceVarsByValue first' (newVars)
-  let second' = unwords $ replaceVarsByValue (words second) (newVars)
-  return (first'',second')
+  newVars <- sequenceQ $ map (generateRandomVars fname) $ extractVarsName first'
+  return (unwordAndMap newVars first',unwordAndMap newVars $ words second)
   where
     first' = words first
+    unwordAndMap newVars = unwords . map (replaceVarsByValue newVars)
 
 extractVarsName :: [String] -> [(String,String)]
 extractVarsName [] = []
 extractVarsName (x:xs)
-  | '@' `elem` x = (take posOfArobase x, drop (posOfArobase+1) x) : extractVarsName xs
+  | '@' `elem` x = (take (posOfArobase x) x, drop ((posOfArobase x)+1) x) : extractVarsName xs
   | otherwise = extractVarsName xs
-  where
-    posOfArobase = fromJust $ elemIndex '@' x
 
-generateRandomVars :: String -> [(String,String)] -> [Q (String,String)]
-generateRandomVars _ [] = []
-generateRandomVars fname ((name,typ):xs) = do
-  res : generateRandomVars fname xs
-  where
-    paren x= return $ "(" ++ show x ++ ")"
-    res = do
+
+posOfArobase :: String -> Int 
+posOfArobase = fromJust . elemIndex '@'
+
+generateRandomVars :: String -> (String,String) -> Q (String,String)
+generateRandomVars fname (name,typ) = do
       value <- case typ of
                 "Int" -> runIO $ (randomIO :: IO Int) >>= paren
                 "Bool" -> runIO $ (randomIO :: IO Bool) >>= paren
                 "Char" -> runIO $ (randomIO :: IO Char) >>= paren
                 otherwise -> fail $ "Bad type specified in the test of " ++ fname ++ " in the variable " ++ name ++ ": "++typ
       return (name,value)
-
-
-replaceVarsByValue :: [String] -> [(String,String)] -> [String]
-replaceVarsByValue [] _ = []
-replaceVarsByValue (x:xs) tab
-  | '@' `elem` x = case lookup (take posOfArobase x) tab of
-    Just a -> a :replaceVarsByValue xs tab
-    Nothing -> x : replaceVarsByValue xs tab
-  | otherwise = x : replaceVarsByValue xs tab
   where
-    posOfArobase = fromJust $ elemIndex '@' x
+    paren x= return $ "(" ++ show x ++ ")"
+
+replaceVarsByValue :: [(String,String)] -> String -> String
+replaceVarsByValue tab x = case elemIndex '@' x of
+  Just i -> case lookup (take i x) tab of
+    Just a -> a
+    Nothing -> x
+  Nothing -> x
 
 eith = either (\x -> fail $ "Failed to parse:" ++ show x)
 
 calculatedRes :: (TestType,String) -> String -> ExpQ
 calculatedRes (Override,actV) _ = eith return $ parseExp $ actV
 calculatedRes (_,actV) testF
-  | null (actV) = varE $ mkName testF
-  | otherwise = eith (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF))) $ parseExp $ actV
---calculatedRes (Spec,actV) _ = [e|True|]
+  | null actV = varE $ mkName testF
+  | otherwise = eith (\x -> return (appRec (reverse (unwindE x),VarE $ mkName testF))) $ parseExp actV
 
-actResByTestType :: TestType -> String -> ExpQ
-actResByTestType _ ar = eith return $ parseExp ar
-
-buildTests :: String -> [Test] -> [Q Dec]
-buildTests _ [] = []
-buildTests s (x:xs) = (buildTests' s x) ++ (buildTests s xs)
+actResByTestType :: String -> ExpQ
+actResByTestType = eith return . parseExp
 
 runTests :: String -> [Q Exp] -> Q Dec
 runTests str funcs_runned = funD fname [fClause]
   where
     fname = mkName $ "_TEST_"++ str
-    ex = appE (appE ([e|(++)|]) (appE [e|unlines|] (appE [e|builFinalString|] (listE funcs_runned)))) (([e|"TOTAL PASSED: " ++ show countRight' ++ "/"++ show length'|]))
+    ex = appE (appE ([e|(++)|]) (appE [e|unlines|] (appE [e|map builFinalString|] (listE funcs_runned)))) (([e|"TOTAL PASSED: " ++ show countRight' ++ "/"++ show length'|]))
     cr = valD (varP (mkName "countRight'")) (normalB (appE [e|countRight|] (listE funcs_runned))) []
     len = valD (varP (mkName "length'")) (normalB (appE [e|length|] (listE funcs_runned))) []
     boo = [e|countRight' == length'|]
@@ -228,29 +215,27 @@ appRec ((x:xs),a) = AppE (appRec (xs,a)) x
 
 -- Run all declarations and store them into a tab
 appRecDec :: [Dec] -> [Q Exp]
-appRecDec [] = []
-appRecDec (x:xs) = (varE (getName x)) : appRecDec xs
+appRecDec = map (varE . getName) 
 
 getName :: Dec -> Name
 getName (FunD name _ ) = name
 
-builFinalString :: [Either String String] -> [String]
-builFinalString [] = [""]
-builFinalString (x:xs) = (either ("Test Errored: " ++ ) ("Test passed: " ++) x ): builFinalString xs
+builFinalString :: Either String String -> String
+builFinalString  = either ("Test Errored: " ++ ) ("Test passed: " ++)
 
 countRight :: [Either a b] -> Int
-countRight z = foldl (\x y -> if isLeft y then x else x+1) (0 :: Int) z
+countRight = foldl (\x y -> if isLeft y then x else x+1) (0 :: Int)
 
 getTestT :: String -> [Test]
-getTestT str = getTestT' (lines str) False (Test [] [] 0)
+getTestT = getTestT' False (Test [] [] 0) . lines
 
 -- t is supposed non empty
-getTestT' :: [String] -> Bool -> Test -> [Test]
-getTestT' [] _ _ = []
-getTestT' (x:xs) b t
-  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' xs True (t {testU = (TestUnit tesT args res nbOfTests) : (testU t)})
-  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' xs False (Test [] [] 0)
-  | otherwise = getTestT' xs b t
+getTestT' :: Bool -> Test -> [String] -> [Test]
+getTestT' _ _ [] = []
+getTestT' b t (x:xs)
+  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' True (t {testU = (TestUnit tesT args res nbOfTests) : (testU t)}) xs
+  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' False (Test [] [] 0) xs
+  | otherwise = getTestT' b t xs
   where
     isStartingWith' = isStartingWith (drop 2 x)
     tesT = if isStartingWith' "[" then Normal else if isStartingWith' "O[" then Override else Spec
@@ -272,16 +257,13 @@ isStartingWith (x:xs) s@(x':xs')
   | x == x' = True && isStartingWith xs xs'
   | otherwise = False
 
-replaceXbyY :: String -> Char -> Char -> String
-replaceXbyY [] _ _ = []
-replaceXbyY (x:xs) a b
-  | x == a = b:replaceXbyY xs a b
-  | otherwise = x : replaceXbyY xs a b
+replaceXbyY :: Char -> Char -> String -> String
+replaceXbyY a b = map (\x -> if x == a then b else x) 
 
 -- To be call with 0 (-1,0)
 parenC :: String -> Int -> (Int,Int) -> (Int, Int)
 parenC str pos t@(i,j)
   | pos >= length str = (0,0)
-  | str!!pos == '[' = parenC str (pos+1) ((if i== -1 then pos else i),j-1)
+  | str!!pos == '[' = parenC str (pos+1) (if i== -1 then pos else i,j-1)
   | str!!pos == ']' = if j== -1 then (i,pos) else parenC str (pos+1) (i,j+1)
   | otherwise = parenC str (pos+1) t
