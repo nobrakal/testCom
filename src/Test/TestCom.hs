@@ -125,7 +125,7 @@ makeAllTests str = do
   let str' = take ((length str)-3) $ replaceXbyY '/' '_' str
   file <- runIO $ readFile str
   funcs <- sequenceQ $ concatMap (buildTests' str') $ getTestT file
-  nd <- runTests str' $ appRecDec funcs
+  nd <- runTests str' $ map (varE . getName) funcs
   return (nd : funcs)
 
 makeAllTestsHere :: Q [Dec]
@@ -165,7 +165,6 @@ extractVarsName [] = []
 extractVarsName (x:xs)
   | '@' `elem` x = (take (posOfArobase x) x, drop ((posOfArobase x)+1) x) : extractVarsName xs
   | otherwise = extractVarsName xs
-
 
 posOfArobase :: String -> Int 
 posOfArobase = fromJust . elemIndex '@'
@@ -212,10 +211,6 @@ runTests str funcs_runned = funD fname [fClause]
 appRec :: ([Exp],Exp) -> Exp
 appRec ([],a) = a
 appRec ((x:xs),a) = AppE (appRec (xs,a)) x
-
--- Run all declarations and store them into a tab
-appRecDec :: [Dec] -> [Q Exp]
-appRecDec = map (varE . getName) 
 
 getName :: Dec -> Name
 getName (FunD name _ ) = name
