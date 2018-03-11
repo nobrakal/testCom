@@ -5,7 +5,7 @@ description:         With some TemplateHaskell magic, you can write your tests i
 license:             GPL
 license-file:        LICENSE
 author:              Alexandre Moine
-maintainer:          nobrakal@cthugha.org
+maintainer:          alexandre@moine.me
 category:            Test
 build-type:          Simple
 extra-source-files:  ChangeLog.md
