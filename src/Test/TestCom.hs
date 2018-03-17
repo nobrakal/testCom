@@ -220,7 +220,7 @@ builFinalString :: Either String String -> String
 builFinalString  = either ("Test Errored: " ++ ) ("Test passed: " ++)
 
 countRight :: [Either a b] -> Int
-countRight = foldl (\x y -> if isLeft y then x else x+1) (0 :: Int)
+countRight = length . filter isRight 
 
 getTestT :: String -> [Test]
 getTestT = getTestT' False (Test [] [] 0) . lines
