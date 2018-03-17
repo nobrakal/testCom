@@ -124,9 +124,10 @@ makeAllTests :: FilePath -> Q [Dec]
 makeAllTests str = makeAllTests' name str
   where
     name = take ((length str)-3) $ replaceXbyY '/' '_' str
+    replaceXbyY a b = map (\x -> if x == a then b else x) 
 
 makeAllTestsHere :: Q [Dec]
-makeAllTestsHere = location >>= (\(Loc y _ _ _ _) -> return y) >>= makeAllTests' "HERE"
+makeAllTestsHere = location >>= makeAllTests' "HERE" . loc_filename
 
 makeAllTests' :: String -> FilePath -> Q [Dec]
 makeAllTests' name fp = do
@@ -165,13 +166,9 @@ makeRandom first second fname = do
     unwordAndMap newVars = unwords . map (replaceVarsByValue newVars)
 
 extractVarsName :: [String] -> [(String,String)]
-extractVarsName [] = []
-extractVarsName (x:xs)
-  | '@' `elem` x = (take (posOfArobase x) x, drop ((posOfArobase x)+1) x) : extractVarsName xs
-  | otherwise = extractVarsName xs
-
-posOfArobase :: String -> Int 
-posOfArobase = fromJust . elemIndex '@'
+extractVarsName = map (\x -> (take (posOfArobase x) x, drop ((posOfArobase x)+1) x)) . filter (elem '@')
+  where 
+    posOfArobase = fromJust . elemIndex '@'
 
 generateRandomVars :: String -> (String,String) -> Q (String,String)
 generateRandomVars fname (name,typ) = do
@@ -248,18 +245,11 @@ getTestT' b t (x:xs)
     res = if (sa,sb) == (0,0) then args' else res'
     hw = head (words x)
 
+-- Like isPrefixOf but without the spaces counted
 isStartingWith :: String -> String -> Bool
-isStartingWith [] _ = False
-isStartingWith _ [] = True
-isStartingWith (x:xs) s@(x':xs')
-  | x == ' ' = isStartingWith xs s
-  | x == x' = True && isStartingWith xs xs'
-  | otherwise = False
+isStartingWith toTest = isPrefixOf toTest . filter (\x -> x /= ' ')
 
-replaceXbyY :: Char -> Char -> String -> String
-replaceXbyY a b = map (\x -> if x == a then b else x) 
-
--- To be call with 0 (-1,0)
+-- To be called with 0 (-1,0)
 parenC :: String -> Int -> (Int,Int) -> (Int, Int)
 parenC str pos t@(i,j)
   | pos >= length str = (0,0)
