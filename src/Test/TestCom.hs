@@ -247,7 +247,7 @@ getTestT' b t (x:xs)
 
 -- Like isPrefixOf but without the spaces counted
 isStartingWith :: String -> String -> Bool
-isStartingWith toTest = isPrefixOf toTest . filter (\x -> x /= ' ')
+isStartingWith str toTest = isPrefixOf toTest $ concat $ words $ str 
 
 -- To be called with 0 (-1,0)
 parenC :: String -> Int -> (Int,Int) -> (Int, Int)
