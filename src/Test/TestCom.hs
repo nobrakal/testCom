@@ -121,15 +121,19 @@ data Test = Test {
 --
 -- This also create sub-functions that each produce a Eihter String String
 makeAllTests :: FilePath -> Q [Dec]
-makeAllTests str = do
-  let str' = take ((length str)-3) $ replaceXbyY '/' '_' str
-  file <- runIO $ readFile str
-  funcs <- sequenceQ $ concatMap (buildTests' str') $ getTestT file
-  nd <- runTests str' $ map (varE . getName) funcs
-  return (nd : funcs)
+makeAllTests str = makeAllTests' name str
+  where
+    name = take ((length str)-3) $ replaceXbyY '/' '_' str
 
 makeAllTestsHere :: Q [Dec]
-makeAllTestsHere = location >>= (\(Loc y _ _ _ _) -> return y) >>= makeAllTests
+makeAllTestsHere = location >>= (\(Loc y _ _ _ _) -> return y) >>= makeAllTests' "HERE"
+
+makeAllTests' :: String -> FilePath -> Q [Dec]
+makeAllTests' name fp = do
+  file <- runIO $ readFile fp
+  funcs <- sequenceQ $ concatMap (buildTests' name) $ getTestT file
+  nd <- runTests name $ map (varE . getName) funcs
+  return (nd : funcs)
 
 buildTests' :: String -> Test -> [Q Dec]
 buildTests' _ (Test [] _ _) = []

@@ -36,8 +36,8 @@ $(makeAllTests "some/Path/File.hs")
 -- Tests
 main :: IO ()
 main = do
-  let (str,res) = _TEST_path -- Here, path=directory_actualfile. If your file is put in tests/Main.hs, then path=tests_Main (without the ".hs")
-  let (str',res') = _TEST_some_Path_File
+  let (str,res) = _TEST_HERE
+  let (str',res') = _TEST_some_Path_File --The main TEST functions is named with the path with backslash replaced by underscore, and without the file extension.
   putStrLn str
   putStrLn str'
   if res && res' then exitSuccess else exitFailure

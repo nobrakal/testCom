@@ -13,7 +13,7 @@ $(makeAllTestsHere)
 
 main :: IO ()
 main = do
-  let (str,res) = _TEST_tests_Main
+  let (str,res) = _TEST_HERE
   putStrLn str
   if res then exitSuccess else exitFailure
 
