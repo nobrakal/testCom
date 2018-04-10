@@ -21,16 +21,21 @@ source-repository head
 
 library
   exposed-modules:     Test.TestCom
-  build-depends:       base >=4.9 && <4.11,  template-haskell >= 2.11.1.0, haskell-src-meta >= 0.8.0.1, random >= 1.1
+  other-modules:       Test.TestCom.Type, Test.TestCom.Parser.Parser
+  build-depends:       base >=4.9 && <4.11,  
+                       template-haskell >= 2.11.1.0,
+                       haskell-src-meta >= 0.8.0.1,
+                       random >= 1.1,
+                       parsec
   hs-source-dirs:      src
   default-language:    Haskell2010
 
 test-suite tests
   type:                exitcode-stdio-1.0
-  other-modules:       Test.TestCom
   main-is:             Main.hs
-  build-depends:       base >=4.9,  template-haskell >= 2.11.1.0, haskell-src-meta >= 0.8.0.1, random >= 1.1
+  build-depends:       testCom,
+                       base >=4.9 && <4.11,  
+                       template-haskell >= 2.11.1.0
 
-  hs-source-dirs:      tests,
-                       src
+  hs-source-dirs:      tests
   default-language:    Haskell2010

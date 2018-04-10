@@ -96,20 +96,8 @@ import Data.Either
 import Data.Maybe (fromJust)
 import System.Random
 
-data TestType = Normal | Override | Spec deriving (Show, Eq)
-
-data TestUnit = TestUnit {
-  typeOfT :: TestType,
-  args :: String,
-  result :: String,
-  numOfTests :: Int
-} deriving (Show)
-
-data Test = Test {
-  testU :: [TestUnit], -- list of (is the test normal,args) and the number of tests to do.
-  testF :: String,
-  actualU :: Int
-} deriving (Show)
+import Test.TestCom.Type
+import Test.TestCom.Parser.Parser
 
 -- | With a path like some\/Path\/File.hs, Create a function
 --
@@ -131,10 +119,13 @@ makeAllTestsHere = location >>= makeAllTests' "HERE" . loc_filename
 
 makeAllTests' :: String -> FilePath -> Q [Dec]
 makeAllTests' name fp = do
-  file <- runIO $ readFile fp
-  funcs <- sequenceQ $ concatMap (buildTests' name) $ getTestT file
-  nd <- runTests name $ map (varE . getName) funcs
-  return (nd : funcs)
+  file <- runIO $! getTestT fp
+  case file of
+    Left error -> fail $ show error
+    Right testList -> do
+      funcs <- sequenceQ $ concatMap (buildTests' name) testList
+      nd <- runTests name $ map (varE . getName) funcs
+      return (nd : funcs)
 
 buildTests' :: String -> Test -> [Q Dec]
 buildTests' _ (Test [] _ _) = []
@@ -221,38 +212,3 @@ builFinalString  = either ("Test Errored: " ++ ) ("Test passed: " ++)
 
 countRight :: [Either a b] -> Int
 countRight = length . filter isRight 
-
-getTestT :: String -> [Test]
-getTestT = getTestT' False (Test [] [] 0) . lines
-
--- t is supposed non empty
-getTestT' :: Bool -> Test -> [String] -> [Test]
-getTestT' _ _ [] = []
-getTestT' b t (x:xs)
-  | "--" `isPrefixOf` x && (isStartingWith' "[" || isStartingWith' "O[" || isStartingWith' "S[" ) && isStartingWith (reverse x) "]" = getTestT' True (t {testU = (TestUnit tesT args res nbOfTests) : (testU t)}) xs
-  | not (null $ words x) && not ("--" `isPrefixOf` hw) && b = t {testF = hw} : getTestT' False (Test [] [] 0) xs
-  | otherwise = getTestT' b t xs
-  where
-    isStartingWith' = isStartingWith (drop 2 x)
-    tesT = if isStartingWith' "[" then Normal else if isStartingWith' "O[" then Override else Spec
-    nbOfTests = if tesT == Spec then read (drop (ta+1) $ take (tb) x) else 1
-    (fa,fb) = parenC x 0 (-1,0)
-    (sa,sb) = parenC x (fb+1) (-1,0)
-    (ta,tb) = parenC x (sb+1) (-1,0)
-    args' = drop (fa+1) $ take fb x
-    res' = drop (sa+1) $ take sb x
-    args = if (sa,sb) == (0,0) then [] else args'
-    res = if (sa,sb) == (0,0) then args' else res'
-    hw = head (words x)
-
--- Like isPrefixOf but without the spaces counted
-isStartingWith :: String -> String -> Bool
-isStartingWith str toTest = isPrefixOf toTest $ concat $ words $ str 
-
--- To be called with 0 (-1,0)
-parenC :: String -> Int -> (Int,Int) -> (Int, Int)
-parenC str pos t@(i,j)
-  | pos >= length str = (0,0)
-  | str!!pos == '[' = parenC str (pos+1) (if i== -1 then pos else i,j-1)
-  | str!!pos == ']' = if j== -1 then (i,pos) else parenC str (pos+1) (i,j+1)
-  | otherwise = parenC str (pos+1) t
